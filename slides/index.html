@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>pa 4</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Ying Zhang" />
+    <meta name="date" content="2025-03-31" />
+    <script src="libs/header-attrs-2.29/header-attrs.js"></script>
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/default-fonts.css" rel="stylesheet" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+.title[
+# pa 4
+]
+.author[
+### Ying Zhang
+]
+.institute[
+### Rutgers University
+]
+.date[
+### 2025-03-31
+]
+
+---
+
+# 1. Setup
+
+``` r
+library("tidyverse")
+library("ds4ling")
+library("untidydata")
+library("here")
+library("broom")
+data &lt;- read.csv(here("data_raw", "fricatives","fricatives.csv"))
+```
+---
+# 2. Tidy the data
+.tiny[
+
+``` r
+data_tidy &lt;- data |&gt; 
+  pivot_longer(cols = c("s_cog","s_skewness","sh_cog","sh_skewness"),
+    names_to = "sounds", values_to = "values"
+  ) |&gt; 
+  separate(col = sounds, into = c("phoneme", "measurement"), sep = "_"
+  ) |&gt; 
+  pivot_wider(
+    names_from = measurement,
+    values_from = values
+  ) |&gt; 
+  mutate_if(is.numeric,round, digits = 2)
+
+write_csv(data_tidy, "/Users/yingzhang/Desktop/R/pa4/data_tidy/fricatives_tidy.csv")
+
+head(data_tidy)
+```
+
+```
+## # A tibble: 6 × 4
+##     obs phoneme   cog skewness
+##   &lt;dbl&gt; &lt;chr&gt;   &lt;dbl&gt;    &lt;dbl&gt;
+## 1     1 s       3285.     2.72
+## 2     1 sh      2556.     2.31
+## 3     2 s       3511.     3.09
+## 4     2 sh      2781.     2.47
+## 5     3 s       4029.     3.33
+## 6     3 sh      2979.     2.48
+```
+]
+---
+# 3. Descriptive statistics
+
+``` r
+data_tidy |&gt; 
+  group_by(phoneme) |&gt; 
+  summarise(avg_cog = mean(cog),
+            std_cog = sd(cog),
+            avg_ske = mean(skewness),
+            std_ske = mean(skewness)) |&gt; 
+  mutate_if(is.numeric, round, digits =2) |&gt; 
+  knitr::kable()
+```
+
+
+
+|phoneme | avg_cog| std_cog| avg_ske| std_ske|
+|:-------|-------:|-------:|-------:|-------:|
+|s       | 5600.45|  831.39|    3.79|    3.79|
+|sh      | 4093.86|  775.06|    3.07|    3.07|
+
+---
+# 4. Center of gravity as a function of phoneme
+
+``` r
+data_tidy |&gt; 
+ggplot() + aes(x = phoneme, y = cog) + geom_boxplot() + labs(x = "Phoneme", y = "Center of gravity")
+```
+
+![](index_files/figure-html/unnamed-chunk-4-1.png)&lt;!-- --&gt;
+---
+# 5. Skewness as a function of phoneme
+
+``` r
+data_tidy |&gt; ggplot() + aes(x = phoneme, y = skewness) + stat_summary(fun = mean, geom = "point") + stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2)
+```
+
+![](index_files/figure-html/unnamed-chunk-5-1.png)&lt;!-- --&gt;
+
+---
+# 6. Center of gravity as a function of skewness for the [s] segments
+## Summary
+
+``` r
+data_s &lt;- data_tidy |&gt;pivot_wider(names_from = phoneme, values_from = c(cog, skewness))
+
+mod1 &lt;- lm(cog_s ~ skewness_s, data = data_s)
+
+mod_summary &lt;- tidy(mod1) 
+
+  knitr::kable(mod_summary, digits = 3 )
+```
+
+
+
+|term        | estimate| std.error| statistic| p.value|
+|:-----------|--------:|---------:|---------:|-------:|
+|(Intercept) | -765.687|   531.001|    -1.442|   0.156|
+|skewness_s  | 1678.214|   139.109|    12.064|   0.000|
+---
+# 6. Center of gravity as a function of skewness for the [s] segments 
+## Scatterplot
+
+
+``` r
+data_s |&gt; 
+  ggplot() +
+  aes(x = skewness_s, y = cog_s) +
+  geom_point() + geom_smooth(method = "lm") +
+  labs(x = "Skewness", y = "Center of gravity") + 
+  ggtitle("Center of gravity as a function of skewness for [s]")
+```
+
+```
+## `geom_smooth()` using formula = 'y ~ x'
+```
+
+![](index_files/figure-html/unnamed-chunk-7-1.png)&lt;!-- --&gt;
+
+---
+# 7. Model diagnostics
+
+``` r
+summary(mod1)
+```
+
+```
+## 
+## Call:
+## lm(formula = cog_s ~ skewness_s, data = data_s)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -999.12 -255.61  -22.86  276.95 1013.63 
+## 
+## Coefficients:
+##             Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)   -765.7      531.0  -1.442    0.156    
+## skewness_s    1678.2      139.1  12.064 3.85e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 418.3 on 48 degrees of freedom
+## Multiple R-squared:  0.752,	Adjusted R-squared:  0.7468 
+## F-statistic: 145.5 on 1 and 48 DF,  p-value: 3.849e-16
+```
+
+---
+# 7. Model diagnostics
+
+
+``` r
+ds4ling::diagnosis(mod1)
+```
+
+![](index_files/figure-html/unnamed-chunk-9-1.png)&lt;!-- --&gt;
+
+---
+# 8. The results
+The data of fricatives was analyzed using a linear model to examine the effect of skewness on center of gravity in terms of [s]. In the plot of residuals (the left panel), the residuals are scattered randomly with no clear pattern, indicating a linear relationship between the skewness and center of gravity. The histogram has a bell-like shape centered close to 0, which suggests that the residuals are approximately normally distributed. The Q-Q plot shows that most points fall closely along the line only with minor deviation in the tail. It indicates that the residuals are highly normally distributed.
+
+The summary shows that the model can account for 75.2% of the variance (Multiple R-squared: 0.752, Adjusted R-squared: 0,7468). Center of gravity has a linear relationship with skewness in terms of [s] (t = 12.064, p &lt; .001). Every one unit change of skewness is associated with an increase of center of gravity by 1678.2 units. 
+---
+# 9. Scatterplot (assumptions)
+
+``` r
+data_asm &lt;- read.csv(here("data_raw", "fricatives","assumptions.csv"))
+
+data_asm |&gt; 
+  ggplot() +
+  aes(x = x, y = y) +
+  geom_point()
+```
+
+![](index_files/figure-html/unnamed-chunk-10-1.png)&lt;!-- --&gt;
+---
+# 9. Explanation
+
+x and y are not linearly correlated as shown in the plot. One value of x can correspond to more than one value of y so there is no model that fits this data but a dinosaur can!
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+  "highlightStyle": "github",
+  "highlightLines": true,
+  "countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
