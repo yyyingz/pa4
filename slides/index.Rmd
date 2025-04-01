@@ -44,7 +44,7 @@ head(data_tidy)
 ]
 ---
 # 3. Descriptive statistics
-```{r, fig.height=2, fig.width=4, out.width="50%"}
+```{r}
 data_tidy |> 
   group_by(phoneme) |> 
   summarise(avg_cog = mean(cog),
@@ -125,3 +125,9 @@ data_asm |>
 # 9. Explanation
 
 x and y are not linearly correlated as shown in the plot. One value of x can correspond to more than one value of y so there is no model that fits this data but a dinosaur can!
+
+
+
+
+
+
